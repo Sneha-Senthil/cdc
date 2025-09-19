@@ -1,0 +1,21 @@
+task scheduling 
+
+fy2
+fy3
+sudo apt update
+sudo apt install openssh-server 
+sudo systemctl status ssh
+
+fy1
+ssh-keygen -t rsa 3 enter
+ssh-copy-id fy2@fy2
+ssh-copy-id fy3@fy3
+ssh fy2@fy2 'hostname'
+ssh fy3@fy3 'hostname'
+crontab -e
+1
+*****ssh fy2@fy2 'echo" task executed on $(hostname) on $(date)" >> /tmp/cron_job.log'
+* * * * * ssh fy3@fy3 'echo "Task executed on $(hostname) at $(date)" >> /tmp/cron_job.log'
+1min
+ssh fy2@fy2 'cat /tmp/cron_job.log'
+ssh fy3@fy3 'cat /tmp/cron_job.log'

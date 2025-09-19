@@ -1,0 +1,26 @@
+load balancing
+ip a
+fy1 
+sudo nano /etc/hosts
+fy2 
+fy3 
+sudo apt update
+sudo apt install apache2 -y
+sudo nano /var/www/html/index.html-- add fy2 save
+sudo systemctl restart apache2
+check browser 
+fy1
+sudo apt update
+sudo apt install haproxy -y
+sudo nanp /etc/haproxy/haproxy.cfg
+frontend http_front
+bind *:80
+stats uri /haproxy?stats
+default_backend http_back
+
+backend http_back
+balance roundrobin
+server fy2 fy2:80 check 
+server fy3 fy3:80 check
+sudo systemctl restart haproxy 
+go to fy1 browser and refresh 
