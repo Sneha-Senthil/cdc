@@ -1,69 +1,70 @@
-DataObject.py:
+# ================== EX1 - IPC ====================
+# data_object.py:
 class DataObject:
-    def __init__(self, values):
-        self.values = values
+    def __init__(self, values):
+        self.values = values
 
-Server.py:
+# server.py:
 import socket
 import pickle
 from data_object import DataObject
 
 HOST = '127.0.0.1'
-PORT = 8000
+PORT = 8044
 
 # Create server socket
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((HOST, PORT))
 server_socket.listen()
 
-print(f"<SERVER> Listening on {HOST}:{PORT}...")
+print(f"<SERVER> Listening on {HOST}:{PORT}")
 
 conn, addr = server_socket.accept()
 print(f"<SERVER> Connected by {addr}")
 
 while True:
-    raw_data = conn.recv(1024) # Recceive the raw data
+    raw_data = conn.recv(1024) # receive raw data
 
-    data = pickle.loads(raw_data) # Could be of type DataObject | str
+    data = pickle.loads(raw_data)
 
-    if isinstance(data, str):
-        conn.send("Connection Terminated...".encode())
-        conn.close()
-        print("<SERVER> Connection Terminated...")
-        break
+    if isinstance(data, str):
+        conn.send("Connection Terminated..".encode())
+        conn.close()
+        print("<SERVER> Connection Terminated...")
+        break
 
-    print(f"<SERVER> Received: {data.values}")
-    # Compute the sum of values
-    total = str(sum(data.values))
+    print(f"<SERVER> Received: {data.values}")
 
-    conn.send(total.encode())
+    total = str(sum(data.values))
+
+    conn.send(total.encode())
+
 
 server_socket.close()
 
-Client.py:
+# client.py:
 import socket
 import pickle
 from data_object import DataObject
 
 HOST = '127.0.0.1'
-PORT = 8000
+PORT = 8044
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client_socket.connect((HOST, PORT))
 
-print("<CLIENT> Connected to server.")
+print("<CLIENT> Connected to Server.")
 
-# Create the Data object
 values = [1, 2, 3, 4, 5, 6, 7, 8]
-obj = DataObject(values)
+obj = DataObject(values=values)
 
 # Send the serialized object
 raw_data = pickle.dumps(obj)
 client_socket.send(raw_data)
 
-# Receive the response
+# Receive Response
 total_value = client_socket.recv(1024).decode()
-print(f"<SERVER> Response from Server: {total_value}")
+print(f"<SERVER> Response from server: {total_value}")
 
 exit_msg = "exit"
 raw_exit = pickle.dumps(exit_msg)
