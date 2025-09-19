@@ -1,82 +1,70 @@
-Token Passing Algorithm:
+import threading, queue, time, random
 
-token-passing.py:
-import socket
-import threading
-import time
-import sys
+N = 4  # number of processes in the ring
+lock = threading.Lock()
 
-class TokenRingNode:
-    def __init__(self, port, next_host, next_port, has_token=False, request_cs=False):
-        self.port = port
-        self.next_host = next_host
-        self.next_port = next_port
-        self.has_token = has_token
-        self.request_cs = request_cs
-        self.running = True
+def log(pid, msg):
+    with lock:
+        print(f"[{time.strftime('%H:%M:%S')}] P{pid}: {msg}")
 
-    def listen(self):
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind(('localhost', self.port))
-        server.listen(5)
-        print(f"[{self.port}] Listening for token...")
+class Process(threading.Thread):
+    def __init__(self, pid, inbox, outbox):
+        super().__init__(daemon=True)
+        self.pid = pid
+        self.inbox = inbox   # queue to receive token (or messages)
+        self.outbox = outbox # queue of next process
+        self.want_cs = False
 
-        while self.running:
-            conn, _ = server.accept()
-            token = conn.recv(1024).decode()
-            conn.close()
+    def run(self):
+        while True:
+            # random time before wanting CS
+            time.sleep(random.uniform(2, 6))
+            self.want_cs = True
+            log(self.pid, "Wants CS (will wait for token)")
 
-            if token == "TOKEN":
-                print(f"[{self.port}] Token received")
-                self.has_token = True
-                if self.request_cs:
-                    self.enter_critical_section()
-                self.send_token()
-            time.sleep(1)
+            # wait for token/message
+            while True:
+                try:
+                    token = self.inbox.get(timeout=0.5)
+                except queue.Empty:
+                    continue
+                # token is a dict; token['holder'] is pid that holds it now
+                if token.get("type") == "TOKEN":
+                    # we hold token
+                    log(self.pid, "Received TOKEN")
+                    if self.want_cs:
+                        log(self.pid, "*** ENTER CS ***")
+                        time.sleep(1)  # in critical section
+                        log(self.pid, "*** EXIT  CS ***")
+                        self.want_cs = False
+                    # pass token to next
+                    self.outbox.put({"type": "TOKEN"})
+                    log(self.pid, "Passed TOKEN to next")
+                    break
+                else:
+                    # ignore unknown messages
+                    pass
 
-    def send_token(self):
-        if self.has_token:
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.connect((self.next_host, self.next_port))
-                s.send("TOKEN".encode())
-                s.close()
-                print(f"[{self.port}] Token passed to {self.next_port}")
-                self.has_token = False
-            except:
-                print(f"[{self.port}] Failed to send token")
+def main():
+    # create ring of queues
+    queues = [queue.Queue() for _ in range(N)]
+    procs = []
+    for i in range(N):
+        out = queues[(i+1) % N]
+        p = Process(i, queues[i], out)
+        procs.append(p)
+    for p in procs:
+        p.start()
 
-    def enter_critical_section(self):
-        print(f"[{self.port}] >>> Entering critical section...")
-        time.sleep(3)
-        print(f"[{self.port}] <<< Exiting critical section...")
-        self.request_cs = False
+    # inject initial token into process 0
+    queues[0].put({"type": "TOKEN"})
+    log("MAIN", "Initial TOKEN injected to P0")
 
-    def start(self):
-        t = threading.Thread(target=self.listen)
-        t.start()
-
-        if self.has_token and self.request_cs:
-            self.enter_critical_section()
-            self.send_token()
-
-        while self.running:
-            user_input = input(f"[{self.port}] Type 'request' to enter CS or 'exit' to quit: ").strip()
-            if user_input == 'request':
-                self.request_cs = True
-            elif user_input == 'exit':
-                self.running = False
-                break
-
-        print(f"[{self.port}] Shutting down...")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nStopped.")
 
 if __name__ == "__main__":
-    port = int(sys.argv[1])
-    next_port = int(sys.argv[2])
-    has_token = request_cs = False
-    if len(sys.argv) > 3:
-        has_token = (sys.argv[3] == "yes")
-        request_cs = (sys.argv[4] == "yes")
-
-    node = TokenRingNode(port, 'localhost', next_port, has_token, request_cs)
-    node.start()
+    main()
