@@ -1,0 +1,88 @@
+data_object.py
+
+class DataObject:
+    def __init__(self, text):
+        self.text = text
+
+server.py
+import socket
+import pickle
+from data_object import DataObject
+
+HOST = '127.0.0.1'
+PORT = 8044
+
+# Create server socket
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.bind((HOST, PORT))
+server_socket.listen()
+
+print(f"<SERVER> Listening on {HOST}:{PORT}")
+
+conn, addr = server_socket.accept()
+print(f"<SERVER> Connected by {addr}")
+
+while True:
+    raw_data = conn.recv(1024)
+    if not raw_data:
+        break
+
+    data = pickle.loads(raw_data)
+
+    # If client sends 'exit', terminate connection
+    if isinstance(data, str) and data.lower() == "exit":
+        conn.send("Connection Terminated..".encode())
+        conn.close()
+        print("<SERVER> Connection Terminated...")
+        break
+
+    print(f"<SERVER> Received Sentence: '{data.text}'")
+
+    # Count vowels and consonants
+    sentence = data.text.lower()
+    vowels = sum(1 for ch in sentence if ch in "aeiou")
+    consonants = sum(1 for ch in sentence if ch.isalpha() and ch not in "aeiou")
+
+    result = f"Vowels: {vowels}, Consonants: {consonants}"
+
+    print(f"<SERVER> Sending result: {result}")
+    conn.send(result.encode())
+
+server_socket.close()
+
+
+client.py
+
+import socket
+import pickle
+from data_object import DataObject
+
+HOST = '127.0.0.1'
+PORT = 8044
+
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket.connect((HOST, PORT))
+
+print("<CLIENT> Connected to Server.")
+
+while True:
+    sentence = input("Enter a sentence (or type 'exit' to quit): ")
+
+    if sentence.lower() == "exit":
+        raw_exit = pickle.dumps("exit")
+        client_socket.send(raw_exit)
+        response = client_socket.recv(1024).decode()
+        print(f"<SERVER> {response}")
+        break
+
+    obj = DataObject(text=sentence)
+
+    # Send serialized sentence object
+    raw_data = pickle.dumps(obj)
+    client_socket.send(raw_data)
+
+    # Receive result
+    result = client_socket.recv(1024).decode()
+    print(f"<SERVER> Response: {result}")
+
+client_socket.close()
