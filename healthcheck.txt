@@ -1,0 +1,93 @@
+server.py
+
+import socket
+import threading
+import time
+
+HOST = '127.0.0.1'
+PORT = 8050
+
+# Shared variable to store last completed task
+latest_status = "Server started, waiting for tasks..."
+
+# Function for backup task (every 5 seconds)
+def backup_task():
+    global latest_status
+    while True:
+        time.sleep(5)
+        latest_status = "Backup completed."
+        print("[SERVER] Backup completed.")
+
+# Function for system health check task (every 10 seconds)
+def health_check_task():
+    global latest_status
+    while True:
+        time.sleep(10)
+        latest_status = "System health check done."
+        print("[SERVER] System health check done.")
+
+# Function to handle client requests
+def handle_client(conn, addr):
+    print(f"[SERVER] Connected by {addr}")
+    global latest_status
+    while True:
+        request = conn.recv(1024).decode()
+        if not request:
+            break
+
+        if request.lower() == "exit":
+            conn.send("Connection closed.".encode())
+            print(f"[SERVER] Connection closed with {addr}")
+            break
+        elif request.lower() == "status":
+            conn.send(latest_status.encode())
+        else:
+            conn.send("Invalid request. Type 'status' or 'exit'.".encode())
+
+    conn.close()
+
+def main():
+    # Start periodic tasks
+    threading.Thread(target=backup_task, daemon=True).start()
+    threading.Thread(target=health_check_task, daemon=True).start()
+
+    # Set up server socket
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen()
+    print(f"[SERVER] Listening on {HOST}:{PORT}")
+
+    # Accept client connections
+    while True:
+        conn, addr = server_socket.accept()
+        threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+
+if __name__ == "__main__":
+    main()
+
+
+client.py
+
+
+import socket
+
+HOST = '127.0.0.1'
+PORT = 8050
+
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket.connect((HOST, PORT))
+
+print("<CLIENT> Connected to server.")
+print("Type 'status' to check what has been done, or 'exit' to quit.\n")
+
+while True:
+    msg = input("Enter command: ")
+
+    client_socket.send(msg.encode())
+    response = client_socket.recv(1024).decode()
+    print(f"<SERVER> {response}")
+
+    if msg.lower() == "exit":
+        break
+
+client_socket.close()
